@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Wf/LQI0Z/If6rStpobKcIPbBgCgp0rp3WiEDRmRW83E=' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://trhzjawcwxojqewfhaiw.supabase.co http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ttZJ8ghsKamsGHew3sn/oruC1SWZWlYXA1gehQNB2DM=' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://trhzjawcwxojqewfhaiw.supabase.co http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0F3D3E">
 <link rel="manifest" href="manifest.webmanifest">
@@ -5023,7 +5023,7 @@ const XLSXR = (() => {
 })();
 
 /** version of the app and date of the build (filled in by build.py from mobile/package.json) */
-const APP_VERSION = '0.9.8', APP_BUILD = '2026-11-01';
+const APP_VERSION = '0.9.9', APP_BUILD = '2026-11-01';
 /* ---------- labels: L (interface) and RL (reports) are filled from the language packs, see i18n.js ---------- */
 const MEASURE_STEPS = { 2: 'eerste', 4: 'controle' };
 const stepNames = () => [__('Project'), __('Points'), __('Measure 1'), __('Dampers'), __('Measure 2'), __('Report')];
@@ -5347,12 +5347,12 @@ function sortTree(p, pts) {
 function groupKey(pt) { return `${pt.systemId}|${pt.dir}|${pt.branch || ''}`; }
 function sysOf(p, id) { return p.systems.find(s => s.id === id); }
 function sumTerminals(p, sysId, dir, phase) {
-  const pts = p.points.filter(x => x.systemId === sysId && x.dir === dir && x.kind === 'terminal');
+  const pts = p.points.filter(x => x.systemId === sysId && x.dir === dir && isEndFlow(p, x));
   let s = 0, n = 0; for (const pt of pts) { const q = calcQ(pt, phase, p).q; if (isNum(q)) { s += q; n++; } }
   return n ? s : null;
 }
 function sumDesign(p, sysId, dir) {
-  const pts = p.points.filter(x => x.systemId === sysId && x.dir === dir && x.kind === 'terminal');
+  const pts = p.points.filter(x => x.systemId === sysId && x.dir === dir && isEndFlow(p, x));
   let s = 0, n = 0; for (const pt of pts) if (isNum(pt.designQ)) { s += pt.designQ; n++; }
   return n ? s : null;
 }
@@ -5734,6 +5734,9 @@ function parentOf(p, pt) { let q = rawParent(p, pt), g = 0; while (q && isDev(q)
 function rawChildren(p, id) { return p.points.filter(x => x.parentId === id); }
 /** slaves of a master: line dampers in between are looked through */
 function childrenOf(p, id, d = 0) { const out = []; for (const x of rawChildren(p, id)) { if (isDev(x)) { if (d < 30) out.push(...childrenOf(p, x.id, d + 1)); } else out.push(x); } return out; }
+/** end flow of a unit (what the report sums as «eindorganen»): a grille, or any measured point with nothing hanging under it,
+ *  e.g. a VAV/CAV/iris at the end of a branch. Line dampers (kind device) and the main-duct measurement are not end flows. */
+function isEndFlow(p, pt) { return !!pt && (pt.kind === 'terminal' || pt.kind === 'duct') && !(pt.kind === 'duct' && pt.duct?.main) && childrenOf(p, pt.id).length === 0; }
 function levelOf(p, pt) { let l = 1, q = parentOf(p, pt), g = 0; while (q && g++ < 30) { l++; q = parentOf(p, q); } return l; }
 function descendantIds(p, id) { const out = new Set(); const st = [id]; while (st.length) { const c = st.pop(); for (const k of p.points) if (k.parentId === c && !out.has(k.id)) { out.add(k.id); st.push(k.id); } } return out; }
 const isNode = (pt) => pt && pt.kind === 'duct';
@@ -8500,7 +8503,7 @@ async function buildXlsx(p) {
       ws.set(r, 21, [stl, pt.note, kidsN ? _r('master van {n} punt(en)', { n: kidsN }) + (d.der1 || d.der2 ? ' · ' + _r('debiet = Σ slaves') : '') : '', readText(pt, 'controle') && pt.method !== 'hood' && pt.method !== 'readout' ? _r('meetwaarden: {v}', { v: readText(pt, 'controle') }) : '', pt.added ? _r('toegevoegd door {t}', { t: pt.added.team || pt.added.by || '?' }) : '', blockedNote(p, pt), insNote(p, pt)].filter(Boolean).join(' · '), S.note);
       ws.set(r, 22, pt.photos?.length ? _r("{n} foto('s)", { n: pt.photos.length }) : '', { ...S.tdC, font: f(7.5, false, HS.orange) });
       const grey = { ...S.tdC, font: f(7.5, false, '888888') };
-      ws.set(r, 23, g.s?.code || '', grey); ws.set(r, 24, isDuct ? 'K' : 'E', grey); ws.set(r, 25, lvl, grey); ws.set(r, 26, d.master, grey); if (CREW) ws.set(r, 27, measuredBy(pt), { ...S.tdC, font: f(7.5, false, '666666') }); ws.set(r, CREW ? 28 : 27, insText(p, pt), { ...S.tdC, font: f(7.5, false, '444444'), align: { h: 'center', v: 'center', wrap: true } });
+      ws.set(r, 23, g.s?.code || '', grey); ws.set(r, 24, isEndFlow(p, pt) ? 'E' : 'K', grey); ws.set(r, 25, lvl, grey); ws.set(r, 26, d.master, grey); if (CREW) ws.set(r, 27, measuredBy(pt), { ...S.tdC, font: f(7.5, false, '666666') }); ws.set(r, CREW ? 28 : 27, insText(p, pt), { ...S.tdC, font: f(7.5, false, '444444'), align: { h: 'center', v: 'center', wrap: true } });
       ws.height(r, String(ws.rows.get(r).get(21).v || '').length > 52 || typeText(pt).length > 40 ? 24 : 15); r++;
     }
   }
@@ -8523,10 +8526,10 @@ async function buildXlsx(p) {
   const G = { font: f(9, true, HS.navy), fill: HS.grey, border: B, align: { v: 'center' } }; const GC = { ...G, align: { h: 'center', v: 'center' } };
   const SUMROWS = [];
   for (const s of p.systems) for (const dir of ['T', 'A']) {
-    if (!p.points.some(x => x.systemId === s.id && x.dir === dir && x.kind === 'terminal')) continue;
+    if (!p.points.some(x => x.systemId === s.id && x.dir === dir && isEndFlow(p, x))) continue;
     const crit = `${rng('W')},${critText(s.code)},${rng('D')},"${RL.pe[dir]}",${rng('X')},"E"`;
     const sd = sumDesign(p, s.id, dir); let sq = 0, nq = 0, nt = 0;
-    for (const pt of p.points) if (pt.systemId === s.id && pt.dir === dir && pt.kind === 'terminal') { nt++; const q = rowData(p, pt).q2; if (q != null) { sq += q; nq++; } }
+    for (const pt of p.points) if (pt.systemId === s.id && pt.dir === dir && isEndFlow(p, pt)) { nt++; const q = rowData(p, pt).q2; if (q != null) { sq += q; nq++; } }
     const dv = devOf(nq ? sq : null, sd);
     ws.set(r, 1, `Σ ${s.code} — ${RL.dir[dir].toLowerCase()} (${RL.pe[dir]})`, G); ws.fillRange(r, 2, 6, G); ws.merge(r, 1, r, 6);
     ws.set(r, 7, { f: `SUMIFS(${rng('G')},${crit})`, v: sd ?? 0 }, num(GC, N0));
@@ -8625,7 +8628,7 @@ async function buildXlsx(p) {
     for (const dir of unitDirs(s)) {
       const crit = `${IR}${rng('W')},${critText(s.code)},${IR}${rng('D')},"${RL.pe[dir]}",${IR}${rng('X')},"E"`;
       const sd = sumDesign(p, s.id, dir); let a = 0, na = 0, b = 0, nb = 0;
-      for (const pt of p.points) if (pt.systemId === s.id && pt.dir === dir && pt.kind === 'terminal') { const d = rowData(p, pt); if (d.q1 != null) { a += d.q1; na++; } if (d.q2 != null) { b += d.q2; nb++; } }
+      for (const pt of p.points) if (pt.systemId === s.id && pt.dir === dir && isEndFlow(p, pt)) { const d = rowData(p, pt); if (d.q1 != null) { a += d.q1; na++; } if (d.q2 != null) { b += d.q2; nb++; } }
       L.set(r, 2, _r('Σ eindorganen {dir}', { dir: RL.dir[dir].toLowerCase() }), G); L.set(r, 3, 'm³/h', GC);
       L.set(r, 4, { f: `SUMIFS(${IR}${rng('G')},${crit})`, v: sd ?? 0 }, num(GC, N0));
       L.set(r, 5, { f: `SUMIFS(${IR}${rng('I')},${crit})`, v: na ? a : 0 }, num(GC, N0));
@@ -9039,7 +9042,7 @@ async function buildPdf(p) {
     const sumD = { T: 0, A: 0 }, sumQ = { T: 0, A: 0 }, sumQD = { T: 0, A: 0 }, nQ = { T: 0, A: 0 }, nT = { T: 0, A: 0 }; let okN = 0, measN = 0;
     for (const pt of p.points.filter(measurable)) {
       const d = rowData(p, pt); if (d.d != null) { measN++; if (d.st === RL.stat.ok) okN++; }
-      if (pt.kind === 'terminal' && sumD[pt.dir] != null) { nT[pt.dir]++; if (isNum(d.des)) sumD[pt.dir] += d.des; if (d.q2 != null && isNum(d.des)) { sumQ[pt.dir] += d.q2; sumQD[pt.dir] += d.des; nQ[pt.dir]++; } }
+      if (isEndFlow(p, pt) && sumD[pt.dir] != null) { nT[pt.dir]++; if (isNum(d.des)) sumD[pt.dir] += d.des; if (d.q2 != null && isNum(d.des)) { sumQ[pt.dir] += d.q2; sumQD[pt.dir] += d.des; nQ[pt.dir]++; } }
     }
     const desOf = (dir) => { const v = p.systems.reduce((a, s) => a + (isNum(s.design[dir]) ? s.design[dir] : 0), 0); return v || sumD[dir]; };
     const dirs = ['T', 'A'].filter(dir => desOf(dir) > 0 || nT[dir]);
@@ -9168,7 +9171,7 @@ async function buildPdf(p) {
     for (const rw of fr) body.push([rw.name, rw.unit, v0(rw.d, rw.fm), v0(rw.e, rw.fm), v0(rw.c, rw.fm), rw.dev || '', rw.st || '']);
     for (const dir of unitDirs(s)) {
       const sd = sumDesign(p, s.id, dir); let a = 0, na = 0, b = 0, nb = 0;
-      for (const pt of p.points) if (pt.systemId === s.id && pt.dir === dir && pt.kind === 'terminal') { const d = rowData(p, pt); if (d.q1 != null) { a += d.q1; na++; } if (d.q2 != null) { b += d.q2; nb++; } }
+      for (const pt of p.points) if (pt.systemId === s.id && pt.dir === dir && isEndFlow(p, pt)) { const d = rowData(p, pt); if (d.q1 != null) { a += d.q1; na++; } if (d.q2 != null) { b += d.q2; nb++; } }
       const d = devOf(nb ? b : null, sd); const SB = { fillColor: GREY, fontStyle: 'bold', textColor: NAVY };
       body.push([{ content: _r('Σ eindorganen {dir}', { dir: RL.dir[dir].toLowerCase() }), styles: SB }, { content: 'm³/h', styles: SB }, { content: n0(sd), styles: SB }, { content: na ? nl(a) : '', styles: SB }, { content: nb ? nl(b) : '', styles: SB }, { content: dv(d), styles: SB }, { content: st(d, p.tol.system), styles: SB }]);
     }
@@ -9193,7 +9196,7 @@ async function buildPdf(p) {
     y += 1;
     const groups = reportGroups(p, p.points.filter(measurable));
     { const it = [{ text: _r('Tolerantie ±{a} % · luchtgroep ±{b} %', { a: nl(p.tol.terminal), b: nl(p.tol.system) }), fill: rgb(HS.cream), ink: NAVY }];
-      for (const g of groups) { const tm = g.pts.filter(x => x.kind === 'terminal'); if (!tm.length) continue; let sd = 0, b = 0, nb = 0; for (const pt of tm) { if (isNum(pt.designQ)) sd += pt.designQ; const d = rowData(p, pt); if (d.q2 != null) { b += d.q2; nb++; } }
+      for (const g of groups) { const tm = g.pts.filter(x => isEndFlow(p, x)); if (!tm.length) continue; let sd = 0, b = 0, nb = 0; for (const pt of tm) { if (isNum(pt.designQ)) sd += pt.designQ; const d = rowData(p, pt); if (d.q2 != null) { b += d.q2; nb++; } }
         const r = nb && sd ? b / sd : null; const good = r != null && inTol(r - 1, p.tol.system);
         it.push({ text: _r('{s} {pe} · ontwerp {d} · na {q} m³/h', { s: g.s?.code || '', pe: RL.pe[g.dir], d: nl(sd), q: nb ? nl(b) : '—' }) + (r != null ? ' · ' + nl(r * 100, 1) + ' %' : ''), b: true, fill: r == null ? LGREY : rgb(good ? HS.okF : HS.badF), ink: r == null ? NAVY : rgb(good ? HS.okT : HS.badT) }); }
       chips(it); }
@@ -9220,7 +9223,7 @@ async function buildPdf(p) {
           qc(d.q2, d.der2), c(pct(d.r2), pcS(d.r2, true)), c(dv(d.d), { halign: 'right' }), c(stTxt, { halign: 'center' }),
           c([pt.status ? RL.status[pt.status] : '', pt.note, kidsN ? _r('master van {n}', { n: kidsN }) : '', pt.photos?.length ? _r('foto {n}x', { n: pt.photos.length }) : '', CREW ? measuredBy(pt) : '', blockedNote(p, pt), insNote(p, pt)].filter(Boolean).join(' · '), { fontSize: 5.9 })]);
       }
-      const terms = g.pts.filter(x => x.kind === 'terminal');
+      const terms = g.pts.filter(x => isEndFlow(p, x));
       if (terms.length) {
         let sd = 0, a = 0, na = 0, b = 0, nb = 0; for (const pt of terms) { if (isNum(pt.designQ)) sd += pt.designQ; const d = rowData(p, pt); if (d.q1 != null) { a += d.q1; na++; } if (d.q2 != null) { b += d.q2; nb++; } }
         const ddv = devOf(nb ? b : null, sd); const SS = { fillColor: GREY, textColor: NAVY, fontStyle: 'bold', lineColor: NAVY, lineWidth: { top: 0.3 } };
@@ -10003,7 +10006,9 @@ const yesNo = (v) => { const s = String(v ?? '').trim().toLowerCase(); if (!s) r
 function rdParse(v) {
   if (v == null || v === '') return [];
   if (typeof v === 'number') return isFinite(v) ? [v] : [];
-  return String(v).split(/[;|\/]+/).map(x => parseNum(x)).filter(isNum); // a space is a thousands mark (1 200,0), not a separator
+  // readings are separated by ; | / or by spaces. A space is a thousands mark only inside a number with decimals (1 200,0 — how the app writes it)
+  const toks = String(v).split(/[;|\/]+/).flatMap(part => part.match(/\d{1,3}(?:[\s\u00a0\u202f']\d{3})+[.,]\d+|\S+/g) || []);
+  return toks.map(x => parseNum(x)).filter(isNum);
 }
 /** Excel sheet → result object (same shape as an app result) against the master project */
 function meetbladResult(m, sheets) {

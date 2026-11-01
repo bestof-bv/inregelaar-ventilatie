@@ -1,7 +1,7 @@
 /* Inregelaar Ventilatie — offline cache
    The page itself (index.html, manifest) comes from the network first, so an update is used at the next start with internet;
    without internet (or after 4 s without an answer) the saved copy opens. Scripts and icons: saved copy first, refreshed in the background. */
-const CACHE = 'inregelaar-v27';
+const CACHE = 'inregelaar-v28';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'vendor/jspdf.umd.min.js', 'vendor/jspdf.plugin.autotable.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png', 'icons/apple-touch-icon.png', 'icons/favicon-64.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
