@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-sj5VbLwEadAO796KJgQTCkApJG/GrN5nqAl+FBFX7QU=' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://trhzjawcwxojqewfhaiw.supabase.co http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Ie7FlUTF70bRxiE5saPWS5mJ+R+9/izQUmkv1KA0ymw=' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://trhzjawcwxojqewfhaiw.supabase.co http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0F3D3E">
 <link rel="manifest" href="manifest.webmanifest">
@@ -5017,7 +5017,7 @@ const XLSXR = (() => {
 })();
 
 /** version of the app and date of the build (filled in by build.py from mobile/package.json) */
-const APP_VERSION = '0.9.6', APP_BUILD = '2026-11-01';
+const APP_VERSION = '0.9.7', APP_BUILD = '2026-11-01';
 /* ---------- labels: L (interface) and RL (reports) are filled from the language packs, see i18n.js ---------- */
 const MEASURE_STEPS = { 2: 'eerste', 4: 'controle' };
 const stepNames = () => [__('Project'), __('Points'), __('Measure 1'), __('Dampers'), __('Measure 2'), __('Report')];
@@ -8342,6 +8342,17 @@ function insNote(p, pt) {
 function instrText(p) { return p.instruments.map(i => [i.name, i.type, i.serial && '(' + i.serial + ')'].filter(Boolean).join(' ')).join(' · '); }
 function sysText(p) { return p.systems.map(s => [s.code, s.name, s.unit].filter(Boolean).join(' ') + (unitDirs(s).length === 2 ? (isNum(s.design.T) || isNum(s.design.A) ? ` (${nl(s.design.T)} / ${nl(s.design.A)} m³/h)` : '') : isNum(s.design[unitDirs(s)[0]]) ? ` (${RL.dir[unitDirs(s)[0]].toLowerCase()} ${nl(s.design[unitDirs(s)[0]])} m³/h)` : '')).join(' · '); }
 function methodsUsed(p) { const set = new Set(p.points.filter(measurable).map(x => x.method)); return [_r('Proportioneel'), ...[...set].map(m => RL.mshort[m]).filter(Boolean)].join(' · '); }
+/** 0.9.7: the name of the technician per point only when the work was split over crews: more than one person or more than one crew in the stamps.
+ *  Filled in by one person, the report does not name the technician per point. */
+function crewWork(p) {
+  const by = new Set(), team = new Set();
+  for (const pt of p.points) for (const g of ['eerste', 'controle']) {
+    const st = pt.meas && pt.meas[g] && pt.meas[g].st; if (!st) continue;
+    if (String(st.by || '').trim()) by.add(String(st.by).trim().toLowerCase());
+    if (String(st.team || '').trim()) team.add(String(st.team).trim().toLowerCase());
+  }
+  return by.size > 1 || team.size > 1;
+}
 /** who measured: crew / technician of the latest measurement stamp */
 function measuredBy(pt) {
   const st = (pt.meas && ((pt.meas.controle && pt.meas.controle.st) || (pt.meas.eerste && pt.meas.eerste.st))) || null;
@@ -8376,6 +8387,7 @@ function logoInfo() {
 
 /* ================================================================== Excel */
 async function buildXlsx(p) {
+  const CREW = crewWork(p); // 0.9.7: «Gemeten door» only for crew work
   useStyle();
   const wb = new XLSXW.Workbook(); wb.title = _r('Inregelrapport lucht') + ' ' + (p.info.nr || ''); wb.creator = p.info.company || ''; wb.app = 'Inregelaar Ventilatie ' + APP_VERSION;
   const ST = RL.stat; const q2 = (x) => '"' + String(x).replace(/"/g, '""') + '"';
@@ -8416,7 +8428,7 @@ async function buildXlsx(p) {
   const ws = wb.sheet(_r('Inregelrapport lucht')); ws.paper = 8; ws.tab = HS.navy;
   const COLS = [[_r('Ref.'), 12], [_r('Ruimte / zone'), 24], [_r('Type eindorgaan / regelorgaan'), 32], ['PU/ EX', 6], [_r('Tak'), 10], [_r('Ø / afmeting (mm)'), 10], [_r('Ontwerp m³/h'), 10],
     [_r('Meetmethode'), 17], [_r('Q vóór m³/h'), 9], [_r('% vóór'), 7], [_r('Stand vóór'), 9], [_r('Stand na'), 9], [_r('k-factor (m³/h·Pa⁻⁰·⁵)'), 9], ['ΔP Pa', 7], ['A (m²)', 8], ['v m/s', 7],
-    [_r('Gemeten m³/h'), 10], [_r('% van ontwerp'), 8], [_r('Afwijking'), 9], [_r('Status'), 12], [_r('Opmerking'), 40], [_r("Foto's"), 8], [_r('LG'), 6], [_r('Soort'), 6], [_r('Niv.'), 5], [_r('Master'), 10], [_r('Gemeten door'), 16], [_r('Meettoestel'), 22]];
+    [_r('Gemeten m³/h'), 10], [_r('% van ontwerp'), 8], [_r('Afwijking'), 9], [_r('Status'), 12], [_r('Opmerking'), 40], [_r("Foto's"), 8], [_r('LG'), 6], [_r('Soort'), 6], [_r('Niv.'), 5], [_r('Master'), 10], ...(CREW ? [[_r('Gemeten door'), 16]] : []), [_r('Meettoestel'), 22]];
   const NC = COLS.length; COLS.forEach(([, w], i) => ws.width(i + 1, w));
   title(ws, _r('AIR BALANCING REPORT — INREGELRAPPORT LUCHT'), sub2, NC);
   const infoL = [[_r('Installatie :'), [p.info.nr, p.info.name].filter(Boolean).join(' — ')], [_r('Adres / locatie :'), p.info.address], [_r('Firma :'), p.info.company],
@@ -8474,7 +8486,7 @@ async function buildXlsx(p) {
       ws.set(r, 21, [stl, pt.note, kidsN ? _r('master van {n} punt(en)', { n: kidsN }) + (d.der1 || d.der2 ? ' · ' + _r('debiet = Σ slaves') : '') : '', readText(pt, 'controle') && pt.method !== 'hood' && pt.method !== 'readout' ? _r('meetwaarden: {v}', { v: readText(pt, 'controle') }) : '', pt.added ? _r('toegevoegd door {t}', { t: pt.added.team || pt.added.by || '?' }) : '', blockedNote(p, pt), insNote(p, pt)].filter(Boolean).join(' · '), S.note);
       ws.set(r, 22, pt.photos?.length ? _r("{n} foto('s)", { n: pt.photos.length }) : '', { ...S.tdC, font: f(7.5, false, HS.orange) });
       const grey = { ...S.tdC, font: f(7.5, false, '888888') };
-      ws.set(r, 23, g.s?.code || '', grey); ws.set(r, 24, isDuct ? 'K' : 'E', grey); ws.set(r, 25, lvl, grey); ws.set(r, 26, d.master, grey); ws.set(r, 27, measuredBy(pt), { ...S.tdC, font: f(7.5, false, '666666') }); ws.set(r, 28, insText(p, pt), { ...S.tdC, font: f(7.5, false, '444444'), align: { h: 'center', v: 'center', wrap: true } });
+      ws.set(r, 23, g.s?.code || '', grey); ws.set(r, 24, isDuct ? 'K' : 'E', grey); ws.set(r, 25, lvl, grey); ws.set(r, 26, d.master, grey); if (CREW) ws.set(r, 27, measuredBy(pt), { ...S.tdC, font: f(7.5, false, '666666') }); ws.set(r, CREW ? 28 : 27, insText(p, pt), { ...S.tdC, font: f(7.5, false, '444444'), align: { h: 'center', v: 'center', wrap: true } });
       ws.height(r, String(ws.rows.get(r).get(21).v || '').length > 52 || typeText(pt).length > 40 ? 24 : 15); r++;
     }
   }
@@ -8865,6 +8877,7 @@ async function coverCrop(url, aspect, maxW = 1400) {
   return c.toDataURL('image/jpeg', 0.82);
 }
 async function buildPdf(p) {
+  const CREW = crewWork(p); // 0.9.7: the technician per point only for crew work
   useStyle();
   const { jsPDF, autoTable } = await ensurePdf();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
@@ -9191,7 +9204,7 @@ async function buildPdf(p) {
           c([RL.mshort[pt.method] || '', insText(p, pt, 'tiny')].filter(Boolean).join('\n'), { halign: 'center' }), qc(d.q1, d.der1), c(pct(d.r1), pcS(d.r1, false)), c(pt.reg.posBefore || '', { halign: 'center' }),
           c(pt.reg.posAfter || '', { halign: 'center' }), c(isNum(d.k) ? nl(d.k, 1) : '', { halign: 'center' }), c(isNum(d.dp) ? nl(d.dp, 1) : '', { halign: 'center' }), c(isNum(d.v) ? nl(d.v, 2) : '', { halign: 'center' }),
           qc(d.q2, d.der2), c(pct(d.r2), pcS(d.r2, true)), c(dv(d.d), { halign: 'right' }), c(stTxt, { halign: 'center' }),
-          c([pt.status ? RL.status[pt.status] : '', pt.note, kidsN ? _r('master van {n}', { n: kidsN }) : '', pt.photos?.length ? _r('foto {n}x', { n: pt.photos.length }) : '', measuredBy(pt), blockedNote(p, pt), insNote(p, pt)].filter(Boolean).join(' · '), { fontSize: 5.9 })]);
+          c([pt.status ? RL.status[pt.status] : '', pt.note, kidsN ? _r('master van {n}', { n: kidsN }) : '', pt.photos?.length ? _r('foto {n}x', { n: pt.photos.length }) : '', CREW ? measuredBy(pt) : '', blockedNote(p, pt), insNote(p, pt)].filter(Boolean).join(' · '), { fontSize: 5.9 })]);
       }
       const terms = g.pts.filter(x => x.kind === 'terminal');
       if (terms.length) {
